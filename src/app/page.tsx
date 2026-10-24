@@ -964,6 +964,13 @@ export default function GamePage() {
       if (showUpgradeRef.current) return;
       // 如果焦点在数学输入框，不处理游戏按键
       if (isMathMode && document.activeElement?.tagName === "INPUT") return;
+      
+      // 开发者模式：按O键返回主菜单
+      if (devMode && e.key.toLowerCase() === 'o') {
+        setGameMode("menu");
+        return;
+      }
+      
       keys.add(e.key.toLowerCase());
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(e.key.toLowerCase())) {
         e.preventDefault();
