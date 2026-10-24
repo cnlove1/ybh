@@ -577,6 +577,9 @@ export default function GamePage() {
   const [showAchievement, setShowAchievement] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [consecutiveSpeedUpgrades, setConsecutiveSpeedUpgrades] = useState(0);
+  const [devMode, setDevMode] = useState(false);
+  const [konamiSequence, setKonamiSequence] = useState<string[]>([]);
 
   const showUpgradeRef = useRef(false);
   const attackMultiplierRef = useRef(1.0);
@@ -616,6 +619,35 @@ export default function GamePage() {
       playerColorRef.current = savedColor;
     }
   }, []);
+
+  // 开发者模式键盘监听（上上下下左右左右上下）
+  useEffect(() => {
+    const konamiCode = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameMode !== "menu") return;
+      
+      const newSequence = [...konamiSequence, e.key];
+      
+      // 保持序列长度不超过konamiCode长度
+      if (newSequence.length > konamiCode.length) {
+        newSequence.shift();
+      }
+      
+      setKonamiSequence(newSequence);
+      
+      // 检查是否匹配
+      if (newSequence.length === konamiCode.length && 
+          newSequence.every((key, i) => key === konamiCode[i])) {
+        setDevMode(true);
+        soundManager.playUpgrade();
+        setKonamiSequence([]);
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [gameMode, konamiSequence]);
 
   // 解锁成就
   const unlockAchievement = useCallback((name: string) => {
@@ -749,10 +781,21 @@ export default function GamePage() {
       unlockAchievement("crystal_eaten");
     }
     
+    // 检测连续速度升级成就"博尔特"
+    if (option.id === "speed") {
+      const newCount = consecutiveSpeedUpgrades + 1;
+      setConsecutiveSpeedUpgrades(newCount);
+      if (newCount >= 3) {
+        unlockAchievement("bolt");
+      }
+    } else {
+      setConsecutiveSpeedUpgrades(0);
+    }
+    
     option.apply(stats, player);
     setShowUpgrade(false);
     showUpgradeRef.current = false;
-  }, [unlockAchievement]);
+  }, [unlockAchievement, consecutiveSpeedUpgrades]);
 
   const handleMathSubmit = useCallback(() => {
     const numAnswer = parseInt(mathInput, 10);
@@ -868,6 +911,13 @@ export default function GamePage() {
       pickupRangeMultiplier: 1.0,
       speedMultiplier: 1.0,
     };
+
+    // 应用开发者模式效果
+    if (devMode) {
+      player.speed = PLAYER_SPEED * 3.0;
+      player.attack = PLAYER_ATTACK * 5.0;
+      stats.speedMultiplier = 3.0;
+    }
 
     gameStateRef.current = { stats, player, upgradeCount: 0, monsterScale: 1.0 };
 
@@ -1065,7 +1115,7 @@ export default function GamePage() {
 
     /* ── 掉落资源 ── */
     function spawnResources(x: number, y: number) {
-      const count = Math.floor(Math.random() * 2) + 1;
+      const count = devMode ? 20 : Math.floor(Math.random() * 2) + 1;
       for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const offset = Math.random() * 20 + 10;
@@ -1977,6 +2027,7 @@ export default function GamePage() {
       const allAchievements = [
         { id: "wind_and_waves", name: "风浪越大鱼越贵", desc: "首次进入数学大战特殊模式", icon: "🌊" },
         { id: "crystal_eaten", name: "你的晶核被我吃了", desc: "速度达到300%后继续选择加速强化", icon: "💎" },
+        { id: "bolt", name: "博尔特", desc: "连续3次选择加速强化", icon: "⚡" },
       ];
       return (
         <div className="w-screen h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
@@ -2157,6 +2208,13 @@ export default function GamePage() {
         {showWrongBookHint && (
           <div className="absolute top-24 left-6 bg-yellow-500 text-black font-bold px-4 py-2 rounded-lg shadow-lg animate-bounce z-50">
             去玩数学大战吧！
+          </div>
+        )}
+
+        {/* 开发者模式提示 */}
+        {devMode && (
+          <div className="absolute top-24 right-6 bg-red-500 text-white font-bold px-4 py-2 rounded-lg shadow-lg animate-pulse z-50">
+            🔧 开发者模式已激活
           </div>
         )}
 
