@@ -300,7 +300,7 @@ const RESOURCE_PICKUP_RANGE = 50;
 const RESOURCES_PER_UPGRADE = 20;
 
 const FRICTION = 0.85;
-const KNOCKBACK_FORCE = 300;
+const KNOCKBACK_FORCE = 150;
 
 const MONSTER_DEFS: {
   tier: number;
