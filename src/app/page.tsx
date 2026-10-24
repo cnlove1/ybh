@@ -311,12 +311,12 @@ const MONSTER_DEFS: {
   attackCd: number;
   mass: number;
 }[] = [
-  { tier: 1, attack: 5, hp: 50, speed: 50, radius: 14, attackCd: 1.0, mass: 0.8 },
-  { tier: 2, attack: 10, hp: 70, speed: 30, radius: 18, attackCd: 1.0, mass: 1.2 },
-  { tier: 3, attack: 40, hp: 100, speed: 20, radius: 22, attackCd: 1.2, mass: 1.5 },
-  { tier: 4, attack: 70, hp: 70, speed: 10, radius: 26, attackCd: 1.5, mass: 2.0 },
-  { tier: 5, attack: 100, hp: 112, speed: 7.9999, radius: 30, attackCd: 2.0, mass: 2.5 },
-  { tier: 6, attack: 100, hp: 500, speed: 15, radius: 40, attackCd: 2.5, mass: 5.0 },
+  { tier: 1, attack: 5, hp: 50, speed: 75, radius: 14, attackCd: 1.0, mass: 0.8 },
+  { tier: 2, attack: 10, hp: 70, speed: 45, radius: 18, attackCd: 1.0, mass: 1.2 },
+  { tier: 3, attack: 40, hp: 100, speed: 30, radius: 22, attackCd: 1.2, mass: 1.5 },
+  { tier: 4, attack: 70, hp: 70, speed: 15, radius: 26, attackCd: 1.5, mass: 2.0 },
+  { tier: 5, attack: 100, hp: 112, speed: 11.99985, radius: 30, attackCd: 2.0, mass: 2.5 },
+  { tier: 6, attack: 100, hp: 500, speed: 22.5, radius: 40, attackCd: 2.5, mass: 5.0 },
 ];
 
 const SPAWN_INTERVAL = 2.0;
