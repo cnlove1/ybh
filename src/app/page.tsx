@@ -534,10 +534,10 @@ function getUpgradeOptions(stats: PlayerStats, player: Player): UpgradeOption[] 
       title: "加速强化",
       desc:
         stats.speedMultiplier >= 3.0
-          ? "已达上限（300%）"
+          ? "已达上限（300%），点击无效果"
           : `移动速度 +50%（当前 ${(stats.speedMultiplier * 100).toFixed(0)}%）`,
       icon: "⚡",
-      available: stats.speedMultiplier < 3.0,
+      available: true,
       apply: (s, p) => {
         if (s.speedMultiplier < 3.0) {
           s.speedMultiplier = Math.min(s.speedMultiplier + 0.5, 3.0);
