@@ -601,6 +601,29 @@ export default function GamePage() {
     }
   }, [wrongQuestions.length]);
 
+  const handleReset = useCallback(() => {
+    if (confirm("确定要重置所有游戏数据吗？这将清除所有成就、金币、错题本和设置。")) {
+      // 清除 localStorage
+      localStorage.removeItem("game_achievements");
+      localStorage.removeItem("game_coins");
+      localStorage.removeItem("game_player_color");
+      
+      // 重置状态
+      setUnlockedAchievements([]);
+      setCoins(0);
+      coinsRef.current = 0;
+      setPlayerColor("#FFD700");
+      playerColorRef.current = "#FFD700";
+      setWrongQuestions([]);
+      setDevMode(false);
+      setConsecutiveSpeedUpgrades(0);
+      setKonamiSequence([]);
+      
+      // 显示提示
+      alert("游戏数据已重置！");
+    }
+  }, []);
+
   // 加载成就和金币数据
   useEffect(() => {
     const saved = localStorage.getItem("game_achievements");
@@ -2149,6 +2172,15 @@ export default function GamePage() {
               {wrongQuestions.length}
             </div>
           )}
+        </button>
+
+        {/* 重置按钮 */}
+        <button
+          onClick={handleReset}
+          className="absolute bottom-6 left-6 w-16 h-16 bg-red-600 hover:bg-red-500 rounded-full shadow-lg shadow-red-500/30 flex items-center justify-center transition-all hover:scale-110 z-50"
+          title="重置游戏数据"
+        >
+          <div className="text-2xl">🔄</div>
         </button>
 
         {/* 说明按钮 */}
