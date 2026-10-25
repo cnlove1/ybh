@@ -1739,7 +1739,7 @@ export default function GamePage() {
       setScore(killCount);
       spawnParticles(m.x, m.y, "#ff4444", 15);
       soundManager.playMonsterDeath();
-      if (!isMathMode || developerMode) {
+      if (!isMathMode) {
         spawnResources(m.x, m.y);
       }
     }
@@ -1924,7 +1924,7 @@ export default function GamePage() {
         }
       }
       droppedCoins = droppedCoins.filter(coin => coin.life > 0);
-      if (!isMathMode || developerMode) {
+      if (!isMathMode) {
         for (const r of resources) {
           r.life -= dt;
           if (r.life <= 0) continue;
