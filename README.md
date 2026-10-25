@@ -25,7 +25,7 @@
 安装兼容版本的 Node.js 和 pnpm 后，在终端执行：
 
 ```bash
-git clone https://github.com/flouting-lang/ybh.git
+git clone https://github.com/cnlove1/ybh.git
 cd ybh
 pnpm install --frozen-lockfile
 pnpm dev
