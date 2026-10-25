@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
+const projectRoot = process.env.CHECK_PROJECT_ROOT ?? process.cwd();
 const ts = (() => {
   try {
     return require(path.join(projectRoot, "node_modules", "typescript"));
@@ -14,7 +15,6 @@ const ts = (() => {
   }
 })();
 
-const projectRoot = process.env.CHECK_PROJECT_ROOT ?? process.cwd();
 const errors = [];
 
 function walkSourceFiles(directory, files = []) {

@@ -275,6 +275,33 @@ type GameMode = "menu" | "geometry" | "math";
 /* ───────── 常量 ───────── */
 const PLAYER_HP = 1000;
 const PLAYER_SPEED = 120;
+const MAX_PLAYER_SPEED = PLAYER_SPEED * 3;
+const DEVELOPER_DAMAGE = 2 ** 30;
+const DEVELOPER_SPEED = PLAYER_SPEED * 5;
+const DEVELOPER_DROP_MULTIPLIER = 20;
+const DEVELOPER_CODE = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "arrowup", "arrowdown"];
+const ACHIEVEMENTS_STORAGE_KEY = "ybh-achievements";
+const SPEED_ACHIEVEMENT = {
+  id: "crystal-core",
+  title: "你的晶核被我吃了",
+  description: "速度强化达到300%后，再次点击速度强化。",
+};
+const SKIN_ACHIEVEMENT = { id: "fresh-look", title: "焕然一新", description: "花费10金币更换一次皮肤。" };
+const RESET_ACHIEVEMENT = { id: "play-again", title: "LET'S PLAY AGAIN ", description: "重置金币和成就，重新开始。" };
+const CRIT_ACHIEVEMENT = { id: "critical-overlord", title: "秒天秒地", description: "先将暴击概率升至100%，再将暴击伤害倍率强化到1000%（10倍）或以上；概率满级后，每次暴击强化增加5个百分点伤害倍率。" };
+const COMEBACK_ACHIEVEMENT = { id: "last-stand", title: "残血反杀", description: "在一局游戏中，生命值大于0且不高于10时击杀一个五阶怪物。" };
+const BOLT_ACHIEVEMENT = { id: "bolt", title: "博尔特", description: "一局内连续3次选择速度强化。" };
+const SPECIAL_ACHIEVEMENT = { id: "wind_and_waves", title: "风浪越大鱼越贵", description: "首次进入数学大战特殊模式。" };
+const ACHIEVEMENTS = [SPEED_ACHIEVEMENT, SKIN_ACHIEVEMENT, RESET_ACHIEVEMENT, CRIT_ACHIEVEMENT, COMEBACK_ACHIEVEMENT, BOLT_ACHIEVEMENT, SPECIAL_ACHIEVEMENT];
+const APPEARANCE_STORAGE_KEY = "ybh-appearance";
+const SKIN_COST = 10;
+const PLAYER_SKINS = [
+  { name: "黄金之光", light: "#FFF8DC", color: "#FFD700", dark: "#DAA520" },
+  { name: "冰霜之心", light: "#e0f2fe", color: "#38bdf8", dark: "#0369a1" },
+  { name: "紫晶幻影", light: "#f3e8ff", color: "#c084fc", dark: "#7e22ce" },
+  { name: "翡翠星辰", light: "#dcfce7", color: "#4ade80", dark: "#15803d" },
+  { name: "烈焰之魂", light: "#ffedd5", color: "#fb923c", dark: "#c2410c" },
+];
 const PLAYER_ATTACK = 20;
 const PLAYER_RADIUS = 18;
 const PLAYER_ATTACK_RANGE = 90;
@@ -289,9 +316,10 @@ const PROJECTILE_RADIUS = 5;
 
 const RESOURCE_PICKUP_RANGE = 50;
 const RESOURCES_PER_UPGRADE = 20;
+const MAX_MONSTER_SCALE = 10;
 
 const FRICTION = 0.85;
-const KNOCKBACK_FORCE = 300;
+const KNOCKBACK_FORCE = 150;
 
 const MONSTER_DEFS: {
   tier: number;
@@ -302,12 +330,12 @@ const MONSTER_DEFS: {
   attackCd: number;
   mass: number;
 }[] = [
-  { tier: 1, attack: 5, hp: 50, speed: 50, radius: 14, attackCd: 1.0, mass: 0.8 },
-  { tier: 2, attack: 10, hp: 70, speed: 30, radius: 18, attackCd: 1.0, mass: 1.2 },
-  { tier: 3, attack: 40, hp: 100, speed: 20, radius: 22, attackCd: 1.2, mass: 1.5 },
-  { tier: 4, attack: 70, hp: 70, speed: 10, radius: 26, attackCd: 1.5, mass: 2.0 },
-  { tier: 5, attack: 100, hp: 112, speed: 7.9999, radius: 30, attackCd: 2.0, mass: 2.5 },
-  { tier: 6, attack: 100, hp: 500, speed: 15, radius: 40, attackCd: 2.5, mass: 5.0 },
+  { tier: 1, attack: 5, hp: 50, speed: 75, radius: 14, attackCd: 1.0, mass: 0.8 },
+  { tier: 2, attack: 10, hp: 70, speed: 45, radius: 18, attackCd: 1.0, mass: 1.2 },
+  { tier: 3, attack: 40, hp: 100, speed: 30, radius: 22, attackCd: 1.2, mass: 1.5 },
+  { tier: 4, attack: 70, hp: 70, speed: 15, radius: 26, attackCd: 1.5, mass: 2.0 },
+  { tier: 5, attack: 100, hp: 112, speed: 11.99985, radius: 30, attackCd: 2.0, mass: 2.5 },
+  { tier: 6, attack: 100, hp: 500, speed: 22.5, radius: 40, attackCd: 2.5, mass: 5.0 },
 ];
 
 const SPAWN_INTERVAL = 2.0;
@@ -449,8 +477,22 @@ interface UpgradeOption {
   apply: (stats: PlayerStats, player: Player) => void;
 }
 
-function getUpgradeOptions(stats: PlayerStats, player: Player): UpgradeOption[] {
+function getUpgradeOptions(stats: PlayerStats, player: Player, developerMode = false): UpgradeOption[] {
   return [
+    {
+      id: "speed",
+      title: "速度强化",
+      desc: player.speed >= MAX_PLAYER_SPEED
+        ? `当前速度 ${(player.speed / PLAYER_SPEED * 100).toFixed(0)}%，点击解锁成就`
+        : `移动速度 +50%（当前 ${(player.speed / PLAYER_SPEED * 100).toFixed(0)}%，上限300%）`,
+      icon: "💨",
+      // 达到上限后仍可点击，以触发成就。
+      available: true,
+      apply: (_s, p) => {
+        if (p.speed >= MAX_PLAYER_SPEED) return;
+        p.speed = Math.min(p.speed + PLAYER_SPEED * 0.5, MAX_PLAYER_SPEED);
+      },
+    },
     {
       id: "hp",
       title: "生命强化",
@@ -466,14 +508,14 @@ function getUpgradeOptions(stats: PlayerStats, player: Player): UpgradeOption[] 
       id: "crit",
       title: "暴击精通",
       desc:
-        stats.critRate >= 90
+        stats.critRate >= 100
           ? `暴击倍率 +5%（当前 ${(stats.critMultiplier * 100).toFixed(0)}%）`
           : `暴击率 +10%（当前 ${stats.critRate.toFixed(0)}%）`,
       icon: "⚡",
       available: true,
       apply: (s) => {
-        if (s.critRate >= 90) {
-          s.critMultiplier += 0.05;
+        if (s.critRate >= 100) {
+          s.critMultiplier = Math.round((s.critMultiplier + 0.05) * 100) / 100;
         } else {
           s.critRate = Math.min(s.critRate + 10, 100);
         }
@@ -546,6 +588,105 @@ export default function GamePage() {
   const [showScratchPad, setShowScratchPad] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [attackSpeedMultiplier, setAttackSpeedMultiplier] = useState(1.0);
+  const [developerMode, setDeveloperMode] = useState(false);
+  const [gamePaused, setGamePaused] = useState(false);
+  const gamePausedRef = useRef(false);
+  const mathSubmittedRef = useRef(false);
+  const consecutiveSpeedUpgradesRef = useRef(0);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [showAchievementBook, setShowAchievementBook] = useState(false);
+  const [showAchievementNotice, setShowAchievementNotice] = useState(false);
+  const unlockedAchievementsRef = useRef<string[]>([]);
+  const [achievementNoticeId, setAchievementNoticeId] = useState(SPEED_ACHIEVEMENT.id);
+  const [coins, setCoins] = useState(0);
+  const [skinIndex, setSkinIndex] = useState(0);
+  const [showSkinShop, setShowSkinShop] = useState(false);
+  const appearanceRef = useRef({ coins: 0, skinIndex: 0 });
+  const [showCompletionGuide, setShowCompletionGuide] = useState(false);
+  const allAchievementsUnlocked = ACHIEVEMENTS.every(achievement => unlockedAchievements.includes(achievement.id));
+  const isMainMenu = gameMode === "menu" && !showSkinShop && !showAchievementBook && !showWrongBook && !showInstructions && !showMathModeSelect;
+
+  useEffect(() => {
+    if (!allAchievementsUnlocked || !isMainMenu) {
+      setShowCompletionGuide(false);
+      return;
+    }
+    setShowCompletionGuide(true);
+    const timer = window.setTimeout(() => setShowCompletionGuide(false), 8000);
+    return () => window.clearTimeout(timer);
+  }, [allAchievementsUnlocked, isMainMenu]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(APPEARANCE_STORAGE_KEY) ?? "null");
+      if (saved && Number.isSafeInteger(saved.coins) && saved.coins >= 0 && Number.isInteger(saved.skinIndex) && saved.skinIndex >= 0 && saved.skinIndex < PLAYER_SKINS.length) {
+        appearanceRef.current = { coins: saved.coins, skinIndex: saved.skinIndex };
+        setCoins(saved.coins);
+        setSkinIndex(saved.skinIndex);
+      }
+    } catch {
+      // 存档损坏或浏览器禁止存储时使用默认外观。
+    }
+  }, []);
+
+  const saveAppearance = useCallback((next: { coins: number; skinIndex: number }) => {
+    appearanceRef.current = next;
+    setCoins(next.coins);
+    setSkinIndex(next.skinIndex);
+    try {
+      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // 保留当前页面中的金币与皮肤。
+    }
+  }, []);
+
+  const collectCoin = useCallback(() => {
+    saveAppearance({ ...appearanceRef.current, coins: Math.min(appearanceRef.current.coins + 1, Number.MAX_SAFE_INTEGER) });
+  }, [saveAppearance]);
+
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY) ?? "[]");
+      if (Array.isArray(saved)) {
+        const unlocked = ACHIEVEMENTS.filter(achievement => saved.includes(achievement.id)).map(achievement => achievement.id);
+        unlockedAchievementsRef.current = unlocked;
+        setUnlockedAchievements(unlocked);
+      }
+    } catch {
+      // 存档不可用时，仍可正常游玩并在当前页面获得成就。
+    }
+  }, []);
+
+  const unlockAchievement = useCallback((id: string) => {
+    if (unlockedAchievementsRef.current.includes(id)) return;
+    const unlocked = [...unlockedAchievementsRef.current, id];
+    unlockedAchievementsRef.current = unlocked;
+    setUnlockedAchievements(unlocked);
+    setAchievementNoticeId(id);
+    setShowAchievementNotice(true);
+    try {
+      localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(unlocked));
+    } catch {
+      // 浏览器禁止存储时，保留本次游玩期间的成就。
+    }
+  }, []);
+
+  const unlockSpeedAchievement = useCallback(() => unlockAchievement(SPEED_ACHIEVEMENT.id), [unlockAchievement]);
+
+  const changeSkin = useCallback(() => {
+    const current = appearanceRef.current;
+    if (current.coins < SKIN_COST) return;
+    saveAppearance({ coins: current.coins - SKIN_COST, skinIndex: (current.skinIndex + 1) % PLAYER_SKINS.length });
+    unlockAchievement(SKIN_ACHIEVEMENT.id);
+  }, [saveAppearance, unlockAchievement]);
+
+  const resetProgress = useCallback(() => {
+    saveAppearance({ ...appearanceRef.current, coins: 0 });
+    unlockedAchievementsRef.current = [];
+    setUnlockedAchievements([]);
+    setShowAchievementBook(false);
+    unlockAchievement(RESET_ACHIEVEMENT.id);
+  }, [saveAppearance, unlockAchievement]);
 
   const showUpgradeRef = useRef(false);
   const attackMultiplierRef = useRef(1.0);
@@ -643,6 +784,10 @@ export default function GamePage() {
   }>({ stats: null, player: null, upgradeCount: 0, monsterScale: 1.0 });
 
   const restart = useCallback(() => {
+    consecutiveSpeedUpgradesRef.current = 0;
+    mathSubmittedRef.current = false;
+    gamePausedRef.current = false;
+    setGamePaused(false);
     setGameOver(false);
     setScore(0);
     setShowUpgrade(false);
@@ -650,26 +795,55 @@ export default function GamePage() {
     setMathInput("");
     setAttackMultiplier(1.0);
     attackMultiplierRef.current = 1.0;
-    setWrongQuestions([]);
+    setAttackSpeedMultiplier(1.0);
+    attackSpeedMultiplierRef.current = 1.0;
+    setShowScratchPad(false);
+    isDrawingRef.current = false;
     setShowWrongBook(false);
     setStreakCount(0);
     streakCountRef.current = 0;
-    setIsSpecialMode(false);
-    isSpecialModeRef.current = false;
     setRestartKey((k) => k + 1);
   }, []);
 
+  const startGame = useCallback((mode: GameMode, special = false) => {
+    restart();
+    setIsSpecialMode(special);
+    isSpecialModeRef.current = special;
+    setShowMathModeSelect(false);
+    setGameMode(mode);
+    if (mode === "math" && special) unlockAchievement(SPECIAL_ACHIEVEMENT.id);
+  }, [restart, unlockAchievement]);
+
+  const returnHome = useCallback(() => {
+    restart();
+    setGameMode("menu");
+  }, [restart]);
+
   const handleUpgradeSelect = useCallback((option: UpgradeOption) => {
     const { stats, player } = gameStateRef.current;
-    if (!stats || !player) return;
+    if (!stats || !player || !showUpgradeRef.current || !option.available) return;
+    if (option.id === "speed" && player.speed >= MAX_PLAYER_SPEED) {
+      unlockSpeedAchievement();
+    }
+    consecutiveSpeedUpgradesRef.current = option.id === "speed" ? consecutiveSpeedUpgradesRef.current + 1 : 0;
+    if (consecutiveSpeedUpgradesRef.current >= 3) unlockAchievement(BOLT_ACHIEVEMENT.id);
     option.apply(stats, player);
+    if (option.id === "crit" && stats.critRate >= 100 && stats.critMultiplier >= 10) {
+      unlockAchievement(CRIT_ACHIEVEMENT.id);
+    }
     setShowUpgrade(false);
     showUpgradeRef.current = false;
-  }, []);
+  }, [unlockSpeedAchievement, unlockAchievement]);
+
+  useEffect(() => {
+    mathSubmittedRef.current = false;
+  }, [mathQuestion, mathAnswer, mathInput]);
 
   const handleMathSubmit = useCallback(() => {
-    const numAnswer = parseInt(mathInput, 10);
-    if (isNaN(numAnswer)) return;
+    if (gameMode !== "math" || (gameStateRef.current.player?.hp ?? 0) <= 0 || mathSubmittedRef.current || gameOver || gamePausedRef.current || showUpgradeRef.current || !/^-?\d+$/.test(mathInput.trim())) return;
+    const numAnswer = Number(mathInput.trim());
+    if (!Number.isSafeInteger(numAnswer)) return;
+    mathSubmittedRef.current = true;
 
     if (numAnswer === mathAnswer) {
       // 答对：增加连胜
@@ -726,7 +900,43 @@ export default function GamePage() {
     setMathQuestion(q.question);
     setMathAnswer(q.answer);
     setMathInput("");
-  }, [mathInput, mathAnswer, mathQuestion, attackMultiplier, streakCount, isSpecialMode]);
+  }, [mathInput, mathAnswer, mathQuestion, attackMultiplier, attackSpeedMultiplier, streakCount, isSpecialMode, gameOver, gameMode]);
+
+  useEffect(() => {
+    let sequence: string[] = [];
+    const onDeveloperKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      const key = event.key.toLowerCase();
+      if (developerMode && key === "o" && gameMode !== "menu") {
+        event.preventDefault();
+        returnHome();
+        return;
+      }
+      if (gameMode !== "menu") return;
+      if (developerMode && key === "k") {
+        event.preventDefault();
+        setDeveloperMode(false);
+        restart();
+        sequence = [];
+        return;
+      }
+      if (developerMode) return;
+      if (!key.startsWith("arrow")) {
+        sequence = [];
+        return;
+      }
+      event.preventDefault();
+      sequence = [...sequence, key].slice(-DEVELOPER_CODE.length);
+      if (sequence.join(",") === DEVELOPER_CODE.join(",")) {
+        setDeveloperMode(true);
+        sequence = [];
+      }
+    };
+    window.addEventListener("keydown", onDeveloperKeyDown);
+    return () => window.removeEventListener("keydown", onDeveloperKeyDown);
+  }, [gameMode, developerMode, restart, returnHome]);
 
   useEffect(() => {
     if (gameMode === "menu") return;
@@ -756,6 +966,7 @@ export default function GamePage() {
 
     /* ── 游戏状态 ── */
     const keys = new Set<string>();
+    let attackPaused = false;
     const player: Player = {
       x: W / 2,
       y: H / 2,
@@ -763,8 +974,8 @@ export default function GamePage() {
       vy: 0,
       hp: PLAYER_HP,
       maxHp: PLAYER_HP,
-      speed: PLAYER_SPEED,
-      attack: PLAYER_ATTACK,
+      speed: developerMode ? DEVELOPER_SPEED : PLAYER_SPEED,
+      attack: developerMode ? DEVELOPER_DAMAGE : PLAYER_ATTACK,
       radius: PLAYER_RADIUS,
       attackCooldown: 0,
       rangedCooldown: 0,
@@ -788,6 +999,7 @@ export default function GamePage() {
     let damageTexts: DamageText[] = [];
     let projectiles: Projectile[] = [];
     let resources: Resource[] = [];
+    let droppedCoins: Resource[] = [];
     let spawnTimer = 0;
     let gameTime = 0;
     let killCount = 0;
@@ -822,9 +1034,25 @@ export default function GamePage() {
 
     /* ── 输入 ── */
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
       if (showUpgradeRef.current) return;
-      // 如果焦点在数学输入框，不处理游戏按键
+      if (e.key === " ") {
+        e.preventDefault();
+        if (!e.repeat) attackPaused = !attackPaused;
+        return;
+      }
+      // 输入答案时仍响应空格，其他按键留给输入框。
       if (isMathMode && document.activeElement?.tagName === "INPUT") return;
+      if (e.key === "1") {
+        e.preventDefault();
+        if (!e.repeat) {
+          gamePausedRef.current = !gamePausedRef.current;
+          setGamePaused(gamePausedRef.current);
+          keys.clear();
+        }
+        return;
+      }
+      if (gamePausedRef.current) return;
       keys.add(e.key.toLowerCase());
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(e.key.toLowerCase())) {
         e.preventDefault();
@@ -833,8 +1061,10 @@ export default function GamePage() {
     const onKeyUp = (e: KeyboardEvent) => {
       keys.delete(e.key.toLowerCase());
     };
+    const onBlur = () => keys.clear();
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
 
     /* ── 生成怪物 ── */
     function spawnMonster() {
@@ -850,7 +1080,7 @@ export default function GamePage() {
       const def = MONSTER_DEFS[tier - 1];
 
       const angle = Math.random() * Math.PI * 2;
-      const distance = Math.max(W, H) * 0.6 + Math.random() * 200;
+      const distance = Math.hypot(W / 2, H / 2) + 50 + Math.random() * 30;
       const mx = player.x + Math.cos(angle) * distance;
       const my = player.y + Math.sin(angle) * distance;
 
@@ -911,7 +1141,7 @@ export default function GamePage() {
       const bossHp = tier4Hp * 5 * monsterScale; // 4阶血量的5倍，受难度影响
 
       const angle = Math.random() * Math.PI * 2;
-      const distance = Math.max(W, H) * 0.5;
+      const distance = Math.hypot(W / 2, H / 2) + 80 + Math.random() * 30;
       const mx = player.x + Math.cos(angle) * distance;
       const my = player.y + Math.sin(angle) * distance;
 
@@ -941,7 +1171,7 @@ export default function GamePage() {
     /* ── BOSS召唤三阶怪 ── */
     function bossSummon(boss: Monster) {
       const def = MONSTER_DEFS[2]; // 3阶
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 5 && monsters.length < MAX_MONSTERS; i++) {
         const angle = (Math.PI * 2 * i) / 5;
         const distance = boss.radius + def.radius + 20;
         const mx = boss.x + Math.cos(angle) * distance;
@@ -954,7 +1184,7 @@ export default function GamePage() {
           vy: 0,
           hp: def.hp * monsterScale,
           maxHp: def.hp * monsterScale,
-          speed: def.speed * monsterScale,
+          speed: Math.min(def.speed * monsterScale, def.speed * 2),
           attack: def.attack * monsterScale,
           radius: def.radius,
           tier: def.tier,
@@ -972,7 +1202,7 @@ export default function GamePage() {
 
     /* ── 掉落资源 ── */
     function spawnResources(x: number, y: number) {
-      const count = Math.floor(Math.random() * 2) + 1;
+      const count = (Math.floor(Math.random() * 2) + 1) * (developerMode ? DEVELOPER_DROP_MULTIPLIER : 1);
       for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const offset = Math.random() * 20 + 10;
@@ -987,10 +1217,9 @@ export default function GamePage() {
 
     /* ── 触发升级选择 ── */
     function triggerUpgrade() {
-      monsterScale *= 1.3;
-      if (monsterScale > 100) {
-        monsterScale = 100;
-      }
+      const nextScale = Math.min(monsterScale * 1.3, MAX_MONSTER_SCALE);
+      const scaleIncrease = nextScale / monsterScale;
+      monsterScale = nextScale;
       upgradeCount += 1;
 
       gameStateRef.current.upgradeCount = upgradeCount;
@@ -999,10 +1228,10 @@ export default function GamePage() {
       for (const m of monsters) {
         if (!m.dying) {
           const ratio = m.hp / m.maxHp;
-          m.maxHp *= 1.3;
+          m.maxHp *= scaleIncrease;
           m.hp = m.maxHp * ratio;
-          m.speed *= 1.3;
-          m.attack *= 1.3;
+          m.speed *= scaleIncrease;
+          if (!m.isBoss) m.attack *= scaleIncrease;
           
           // 速度上限：原始速度的200%
           const baseSpeed = MONSTER_DEFS[m.tier - 1].speed;
@@ -1013,7 +1242,7 @@ export default function GamePage() {
         }
       }
 
-      const options = getUpgradeOptions(stats, player);
+      const options = getUpgradeOptions(stats, player, developerMode);
       setUpgradeOptions(options);
       setShowUpgrade(true);
       showUpgradeRef.current = true;
@@ -1044,6 +1273,7 @@ export default function GamePage() {
 
     /* ── 计算暴击 ── */
     function calcDamage(baseDmg: number): { dmg: number; isCrit: boolean } {
+      if (developerMode) return { dmg: DEVELOPER_DAMAGE, isCrit: false };
       const isCrit = Math.random() * 100 < stats.critRate;
       const dmg = isCrit ? Math.round(baseDmg * stats.critMultiplier) : baseDmg;
       return { dmg, isCrit };
@@ -1208,18 +1438,19 @@ export default function GamePage() {
 
     /* ── 绘制玩家 ── */
     function drawPlayer() {
+      const skin = PLAYER_SKINS[appearanceRef.current.skinIndex];
       const sx = player.x - cameraX + W / 2;
       const sy = player.y - cameraY + H / 2;
 
       ctx!.save();
-      ctx!.shadowColor = "#FFD700";
+      ctx!.shadowColor = skin.color;
       ctx!.shadowBlur = 25;
       ctx!.beginPath();
       ctx!.arc(sx, sy, player.radius, 0, Math.PI * 2);
       const pGrad = ctx!.createRadialGradient(sx - 4, sy - 4, 2, sx, sy, player.radius);
-      pGrad.addColorStop(0, "#FFF8DC");
-      pGrad.addColorStop(0.5, "#FFD700");
-      pGrad.addColorStop(1, "#DAA520");
+      pGrad.addColorStop(0, skin.light);
+      pGrad.addColorStop(0.5, skin.color);
+      pGrad.addColorStop(1, skin.dark);
       ctx!.fillStyle = pGrad;
       ctx!.fill();
       ctx!.restore();
@@ -1239,7 +1470,7 @@ export default function GamePage() {
       ctx!.fillStyle = "#fff";
       ctx!.font = "bold 11px monospace";
       ctx!.textAlign = "center";
-      ctx!.fillText(`${Math.ceil(player.hp)}/${player.maxHp}`, sx, sy - player.radius - 16);
+      ctx!.fillText(developerMode ? "∞ / ∞" : `${Math.ceil(player.hp)}/${player.maxHp}`, sx, sy - player.radius - 16);
     }
 
     /* ── 绘制怪物 ── */
@@ -1305,6 +1536,7 @@ export default function GamePage() {
 
     /* ── 绘制子弹 ── */
     function drawProjectiles() {
+      const blackBullets = unlockedAchievementsRef.current.includes(CRIT_ACHIEVEMENT.id);
       for (const proj of projectiles) {
         const sx = proj.x - cameraX + W / 2;
         const sy = proj.y - cameraY + H / 2;
@@ -1319,7 +1551,7 @@ export default function GamePage() {
           sx - nx * tailLen, sy - ny * tailLen, sx, sy
         );
 
-        const baseColor = proj.isCrit ? "255, 200, 0" : "0, 229, 255";
+        const baseColor = blackBullets ? "0, 0, 0" : proj.isCrit ? "255, 200, 0" : "0, 229, 255";
         tailGrad.addColorStop(0, `rgba(${baseColor}, 0)`);
         tailGrad.addColorStop(1, `rgba(${baseColor}, 0.7)`);
         ctx!.strokeStyle = tailGrad;
@@ -1329,15 +1561,20 @@ export default function GamePage() {
         ctx!.lineTo(sx, sy);
         ctx!.stroke();
 
-        ctx!.shadowColor = proj.isCrit ? "#ffc800" : "#00e5ff";
+        ctx!.shadowColor = blackBullets ? "#94a3b8" : proj.isCrit ? "#ffc800" : "#00e5ff";
         ctx!.shadowBlur = proj.isCrit ? 20 : 14;
-        ctx!.fillStyle = proj.isCrit ? "#ffc800" : "#00e5ff";
+        ctx!.fillStyle = blackBullets ? "#000000" : proj.isCrit ? "#ffc800" : "#00e5ff";
         ctx!.beginPath();
         ctx!.arc(sx, sy, proj.radius, 0, Math.PI * 2);
         ctx!.fill();
+        if (blackBullets) {
+          ctx!.strokeStyle = "#64748b";
+          ctx!.lineWidth = 1;
+          ctx!.stroke();
+        }
 
         ctx!.shadowBlur = 0;
-        ctx!.fillStyle = "#ffffff";
+        ctx!.fillStyle = blackBullets ? "#000000" : "#ffffff";
         ctx!.beginPath();
         ctx!.arc(sx, sy, proj.radius * 0.4, 0, Math.PI * 2);
         ctx!.fill();
@@ -1474,13 +1711,13 @@ export default function GamePage() {
       ctx!.fillStyle = "#fff";
       ctx!.font = "bold 12px monospace";
       ctx!.textAlign = "center";
-      ctx!.fillText(`HP ${Math.ceil(player.hp)} / ${player.maxHp}`, W / 2, barY + 12);
+      ctx!.fillText(developerMode ? "HP ∞ / ∞" : `HP ${Math.ceil(player.hp)} / ${player.maxHp}`, W / 2, barY + 12);
 
       ctx!.fillStyle = "rgba(255,255,255,0.3)";
       ctx!.font = "12px monospace";
       ctx!.textAlign = "right";
       const modeText = isMathMode ? "数学大战" : "几何大战";
-      ctx!.fillText(`${modeText} · WASD 移动`, W - 16, H - 12);
+      ctx!.fillText(`${modeText} · WASD 移动 · ${attackPaused ? "攻击已暂停，空格恢复" : "空格暂停攻击"}`, W - 16, H - 12);
 
       ctx!.restore();
     }
@@ -1489,19 +1726,27 @@ export default function GamePage() {
     let lastTime = performance.now();
 
     function onMonsterKill(m: Monster) {
+      if (m.dying) return;
       m.dying = true;
+      if (m.tier === 5 && player.hp > 0 && player.hp <= 10) {
+        unlockAchievement(COMEBACK_ACHIEVEMENT.id);
+      }
+      if (Math.random() < 0.5) {
+        droppedCoins.push({ x: m.x, y: m.y, life: 30, bobPhase: Math.random() * Math.PI * 2 });
+      }
       m.deathTimer = 0.4;
       killCount++;
       setScore(killCount);
       spawnParticles(m.x, m.y, "#ff4444", 15);
       soundManager.playMonsterDeath();
-      if (!isMathMode) {
+      if (!isMathMode || developerMode) {
         spawnResources(m.x, m.y);
       }
     }
 
     function update(dt: number) {
       if (!running) return;
+      if (gamePausedRef.current) return;
       if (showUpgradeRef.current) return;
 
       gameTime += dt;
@@ -1520,20 +1765,19 @@ export default function GamePage() {
           lastSecondMark = currentSecond;
           // 普通模式每秒+1%，特殊模式每秒+2%
           const boostRate = isSpecialMode ? 0.02 : 0.01;
-          monsterScale *= (1 + boostRate);
-          if (monsterScale > 100) {
-            monsterScale = 100;
-          }
+          const nextScale = Math.min(monsterScale * (1 + boostRate), MAX_MONSTER_SCALE);
+          const scaleIncrease = nextScale / monsterScale;
+          monsterScale = nextScale;
           gameStateRef.current.monsterScale = monsterScale;
 
           // 强化现有存活怪物
           for (const m of monsters) {
             if (!m.dying) {
               const ratio = m.hp / m.maxHp;
-              m.maxHp *= (1 + boostRate);
+              m.maxHp *= scaleIncrease;
               m.hp = m.maxHp * ratio;
-              m.speed *= (1 + boostRate);
-              m.attack *= (1 + boostRate);
+              m.speed *= scaleIncrease;
+              if (!m.isBoss) m.attack *= scaleIncrease;
               
               // 速度上限：原始速度的200%
               const baseSpeed = MONSTER_DEFS[m.tier - 1].speed;
@@ -1575,7 +1819,7 @@ export default function GamePage() {
 
       // 近战攻击
       player.attackCooldown -= dt;
-      if (player.attackCooldown <= 0) {
+      if (!attackPaused && player.attackCooldown <= 0) {
         let closest: Monster | null = null;
         let closestDist = Infinity;
         for (const m of monsters) {
@@ -1611,7 +1855,7 @@ export default function GamePage() {
 
       // 远程攻击
       player.rangedCooldown -= dt;
-      if (player.rangedCooldown <= 0) {
+      if (!attackPaused && player.rangedCooldown <= 0) {
         let closest: Monster | null = null;
         let closestDist = Infinity;
         for (const m of monsters) {
@@ -1633,6 +1877,7 @@ export default function GamePage() {
         proj.x += proj.vx * dt;
         proj.y += proj.vy * dt;
         proj.life -= dt;
+        if (proj.life <= 0) continue;
 
         for (const m of monsters) {
           if (m.dying || proj.hitSet.has(m)) continue;
@@ -1668,9 +1913,21 @@ export default function GamePage() {
       projectiles = projectiles.filter((p) => p.life > 0);
 
       // 资源拾取
-      if (!isMathMode) {
+      for (const coin of droppedCoins) {
+        coin.life -= dt;
+        if (coin.life <= 0) continue;
+        if (dist(player, coin) < RESOURCE_PICKUP_RANGE * stats.pickupRangeMultiplier) {
+          coin.life = 0;
+          collectCoin();
+          soundManager.playCollect();
+          spawnDamageText(player.x, player.y - 40, "+1 金币", "#facc15");
+        }
+      }
+      droppedCoins = droppedCoins.filter(coin => coin.life > 0);
+      if (!isMathMode || developerMode) {
         for (const r of resources) {
           r.life -= dt;
+          if (r.life <= 0) continue;
           const pickupRange = RESOURCE_PICKUP_RANGE * stats.pickupRangeMultiplier;
           if (dist(player, r) < pickupRange) {
             r.life = 0;
@@ -1681,11 +1938,13 @@ export default function GamePage() {
 
             if (stats.resourceCount > 0 && stats.resourceCount % RESOURCES_PER_UPGRADE === 0) {
               triggerUpgrade();
+              break;
             }
           }
         }
         resources = resources.filter((r) => r.life > 0);
       }
+      if (showUpgradeRef.current) return;
 
       // 怪物行为
       for (const m of monsters) {
@@ -1721,7 +1980,7 @@ export default function GamePage() {
 
         m.attackCooldown -= dt;
         if (d < m.radius + player.radius + 5 && m.attackCooldown <= 0) {
-          player.hp -= m.attack;
+          if (!developerMode) player.hp -= m.attack;
           m.attackCooldown = MONSTER_DEFS[m.tier - 1].attackCd;
           soundManager.playHurt();
           
@@ -1730,7 +1989,7 @@ export default function GamePage() {
           player.vx += Math.cos(angle) * KNOCKBACK_FORCE * 0.3;
           player.vy += Math.sin(angle) * KNOCKBACK_FORCE * 0.3;
           
-          spawnDamageText(player.x, player.y - player.radius - 15, `-${m.attack}`, "#ff4444");
+          spawnDamageText(player.x, player.y - player.radius - 15, developerMode ? "无敌" : `-${m.attack}`, "#ff4444");
           spawnParticles(player.x, player.y, "#ff4444", 3);
 
           if (player.hp <= 0) {
@@ -1738,6 +1997,7 @@ export default function GamePage() {
             running = false;
             setGameOver(true);
             soundManager.playGameOver();
+            break;
           }
         }
       }
@@ -1763,6 +2023,23 @@ export default function GamePage() {
       ctx!.clearRect(0, 0, W, H);
       drawBackground();
       drawResources();
+      for (const coin of droppedCoins) {
+        const x = coin.x - cameraX + W / 2;
+        const y = coin.y - cameraY + H / 2 + Math.sin(coin.bobPhase + gameTime * 3) * 3;
+        ctx!.save();
+        ctx!.fillStyle = "#facc15";
+        ctx!.shadowColor = "#f59e0b";
+        ctx!.shadowBlur = 12;
+        ctx!.beginPath();
+        ctx!.arc(x, y, 8, 0, Math.PI * 2);
+        ctx!.fill();
+        ctx!.shadowBlur = 0;
+        ctx!.fillStyle = "#854d0e";
+        ctx!.font = "bold 12px sans-serif";
+        ctx!.textAlign = "center";
+        ctx!.fillText("金", x, y + 4);
+        ctx!.restore();
+      }
       drawProjectiles();
       drawParticles();
       drawMonsters();
@@ -1787,11 +2064,73 @@ export default function GamePage() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
     };
-  }, [restartKey, gameMode]);
+  }, [restartKey, gameMode, developerMode, collectCoin, unlockAchievement]);
+
+  const achievementNotice = showAchievementNotice && (
+    <div role="status" className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] max-w-sm rounded-xl border border-yellow-400/60 bg-gray-900 p-4 text-center shadow-xl shadow-yellow-500/20">
+      <div className="text-yellow-300 text-sm mb-1">🏆 成就已解锁</div>
+      <div className="text-white font-bold">{ACHIEVEMENTS.find(achievement => achievement.id === achievementNoticeId)?.title}</div>
+      <p className="text-gray-400 text-xs mt-2">返回主页，在成就图鉴中查看</p>
+      <button onClick={() => setShowAchievementNotice(false)} className="mt-3 px-4 py-1 rounded-lg bg-yellow-500 text-black font-bold">知道了</button>
+    </div>
+  );
 
   // 模式选择界面
   if (gameMode === "menu") {
+    if (showSkinShop) {
+      const currentSkin = PLAYER_SKINS[skinIndex];
+      const nextSkin = PLAYER_SKINS[(skinIndex + 1) % PLAYER_SKINS.length];
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4 text-white">
+          {achievementNotice}
+          <div className="w-full max-w-xl rounded-2xl border border-cyan-500/30 bg-gray-900 p-6">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <h2 className="text-3xl font-bold text-cyan-300">🎨 换肤</h2>
+              <button onClick={() => setShowSkinShop(false)} className="rounded-lg bg-gray-700 hover:bg-gray-600 px-4 py-2">← 返回主页</button>
+            </div>
+            <p className="text-yellow-300 text-xl">🪙 金币：{coins}</p>
+            <p className="text-gray-400 text-sm mt-2">每个怪物有50%概率掉落1枚金币，靠近即可拾取。每次换肤花费10金币，按顺序更换为不同皮肤。</p>
+            <div className="flex justify-around gap-6 my-8 text-center">
+              {[{ label: "当前皮肤", skin: currentSkin }, { label: "下次换肤", skin: nextSkin }].map(({ label, skin }) => (
+                <div key={label}>
+                  <p className="text-gray-400 mb-4">{label}</p>
+                  <div className="w-20 h-20 rounded-full mx-auto mb-4" style={{ background: `radial-gradient(circle at 35% 35%, ${skin.light}, ${skin.color} 50%, ${skin.dark})`, boxShadow: `0 0 24px ${skin.color}66` }} />
+                  <p className="font-bold">{skin.name}</p>
+                </div>
+              ))}
+            </div>
+            <button disabled={coins < SKIN_COST} onClick={changeSkin} className="w-full rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed py-3 text-black font-bold">{coins < SKIN_COST ? `金币不足，还差${SKIN_COST - coins}枚` : "花费10金币换肤"}</button>
+            <p className="text-center text-gray-400 text-sm mt-4">首次换肤解锁成就「焕然一新」</p>
+          </div>
+        </div>
+      );
+    }
+    if (showAchievementBook) {
+      return (
+        <div className="w-screen min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
+          {achievementNotice}
+          <div className="max-w-2xl w-full">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <h2 className="text-3xl font-bold text-yellow-400">🏆 成就图鉴</h2>
+              <button onClick={() => setShowAchievementBook(false)} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg">← 返回主页</button>
+            </div>
+            <p className="text-gray-400 mb-4">已解锁 {unlockedAchievements.length} / {ACHIEVEMENTS.length} 个成就</p>
+            <div className="space-y-4 max-h-[65vh] overflow-y-auto">
+            {ACHIEVEMENTS.map(achievement => (
+              <div key={achievement.id} className={`rounded-xl border p-6 ${unlockedAchievements.includes(achievement.id) ? "border-yellow-500/40 bg-yellow-950/20" : "border-gray-700 bg-gray-900/70"}`}>
+                <div className="text-4xl mb-3">{unlockedAchievements.includes(achievement.id) ? "💎" : "🔒"}</div>
+                <h3 className="text-xl font-bold text-yellow-300">{achievement.title}</h3>
+                <p className="text-gray-300 mt-2">{achievement.description}</p>
+                <p className={`text-sm mt-4 ${unlockedAchievements.includes(achievement.id) ? "text-green-400" : "text-gray-400"}`}>{unlockedAchievements.includes(achievement.id) ? "已解锁" : "未解锁"}</p>
+              </div>
+            ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
     // 错题本视图
     if (showWrongBook) {
       return (
@@ -1843,6 +2182,47 @@ export default function GamePage() {
     // 主菜单视图
     return (
       <div className="w-screen h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center relative">
+        {achievementNotice}
+        {allAchievementsUnlocked && showCompletionGuide && (
+          <div role="status" className="absolute top-28 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg flex items-center gap-3 rounded-2xl border border-amber-300/40 bg-gray-900/95 p-4 shadow-xl shadow-amber-500/10 z-40">
+            <svg viewBox="0 0 120 120" role="img" aria-label="鸡头蛇身的小角色" className="w-24 h-24 shrink-0">
+              <path d="M44 50 C12 69 22 103 60 96 C96 89 76 68 62 79 C48 91 92 118 111 84" fill="none" stroke="#166534" strokeWidth="21" strokeLinecap="round" />
+              <path d="M44 50 C12 69 22 103 60 96 C96 89 76 68 62 79 C48 91 92 118 111 84" fill="none" stroke="#86efac" strokeWidth="14" strokeLinecap="round" />
+              <path d="M31 72 l10 5 M29 85 l11 1 M45 94 l3 -9 M66 90 l-4 -8 M81 99 l1 -9 M98 98 l-6 -7" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" />
+              <path d="M31 29 Q20 13 31 13 Q36 1 42 13 Q55 3 56 24" fill="#ef4444" />
+              <circle cx="42" cy="38" r="23" fill="#fef3c7" />
+              <path d="M61 34 L81 42 L62 48 Z" fill="#fb923c" />
+              <path d="M57 55 Q63 72 51 69 Q44 63 48 54" fill="#ef4444" />
+              <circle cx="49" cy="33" r="4" fill="#111827" />
+              <circle cx="50" cy="32" r="1.3" fill="white" />
+              <path d="M25 44 Q30 51 36 47" fill="none" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+            <div>
+              <p className="text-amber-300 font-bold">鸡蛇：你已经集齐所有成就啦！</p>
+              <p className="mt-2 text-white">悄悄告诉你：按上上下下左右左右上下</p>
+              <p className="mt-1 text-amber-200 font-mono tracking-widest">↑↑↓↓←→←→↑↓</p>
+            </div>
+          </div>
+        )}
+        <button onClick={() => setShowSkinShop(true)} className="absolute bottom-6 right-6 rounded-xl border border-cyan-400/40 bg-gray-900/90 px-4 py-3 text-cyan-200 font-bold z-40 hover:bg-cyan-950">
+          🎨 换肤 · 🪙 {coins}
+        </button>
+        <button onClick={resetProgress} title="清空金币和已有成就，获得重新开始成就" className="absolute bottom-6 left-6 rounded-xl border border-red-400/40 bg-gray-900/90 px-4 py-3 text-red-300 font-bold z-40 hover:bg-red-950">
+          ↺ 重置金币与成就
+        </button>
+        {developerMode && (
+          <div role="status" className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-xl rounded-xl border border-purple-400/50 bg-purple-950/80 p-4 text-center text-purple-100">
+            <p className="font-bold">🛠️ 开发者模式已开启</p>
+            <p className="text-sm mt-1">伤害 1,073,741,824 · 速度 500% · 生命无限 · 材料爆率 2000%</p>
+            <p className="text-sm mt-2">选择模式开始游戏，游戏中按 O 返回主页；在主页按 K 退出开发者模式。</p>
+          </div>
+        )}
+        <button
+          onClick={() => setShowAchievementBook(true)}
+          className="absolute top-6 right-6 px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl shadow-lg shadow-yellow-500/30 z-50"
+        >
+          🏆 成就图鉴（{unlockedAchievements.length}/{ACHIEVEMENTS.length}）
+        </button>
         {/* 错题本按钮 */}
         <button
           onClick={handleWrongBookClick}
@@ -1914,12 +2294,13 @@ export default function GamePage() {
                     <p><span className="text-cyan-400 font-bold">升级选项：</span></p>
                     <ul className="list-disc list-inside ml-4 space-y-1 text-sm">
                       <li>❤️ 生命强化：+200 最大生命值</li>
-                      <li>⚡ 暴击精通：+10% 暴击率（满90%后+5%暴击倍率）</li>
+                      <li>💨 速度强化：+50% 移动速度（上限300%，满级后再次点击可解锁成就）</li>
+                      <li>⚡ 暴击精通：+10% 暴击率（上限100%，满后每次+5%暴击伤害）</li>
                       <li>🔫 多重射击：+1 子弹数（上限5颗）</li>
                       <li>🎯 穿透弹头：+1 穿透数（上限8个）</li>
                       <li>🧲 磁场强化：+50% 收集范围（上限200%）</li>
                     </ul>
-                    <p><span className="text-red-400 font-bold">注意：</span>每次升级怪物强化30%，难度递增！（上限100倍）</p>
+                    <p><span className="text-red-400 font-bold">注意：</span>每次升级怪物强化30%，难度递增！强化上限为1000%（原始属性的10倍）。</p>
                   </div>
                 </div>
 
@@ -1969,6 +2350,10 @@ export default function GamePage() {
                     </ul>
                     <p><span className="text-cyan-400 font-bold">怪物速度上限：</span>所有怪物速度不超过原始速度的200%</p>
                     <p><span className="text-cyan-400 font-bold">物理系统：</span>碰撞、惯性、击退效果</p>
+                    <p><span className="text-cyan-400 font-bold">怪物强化上限：</span>所有模式中，怪物强化最高1000%（原始属性的10倍）；怪物移动速度仍以上述200%为上限。</p>
+                    <p><span className="text-cyan-400 font-bold">暂停攻击：</span>按空格暂停近战和发射子弹，再按一次空格恢复；暂停攻击时仍可移动。</p>
+                    <p><span className="text-cyan-400 font-bold">暂停游戏：</span>按1键暂停整局游戏，再按一次继续；在数学答案输入框中，1键仍用于输入数字。</p>
+                    <p><span className="text-yellow-400 font-bold">金币与换肤：</span>每个怪物有50%概率掉落1枚金币，靠近拾取；主页花费10金币换肤，首次换肤解锁「焕然一新」。</p>
                     <p><span className="text-cyan-400 font-bold">错题本：</span>数学模式答错的题目会记录在首页错题本中</p>
                     <p><span className="text-cyan-400 font-bold">🔊 音效系统：</span></p>
                     <ul className="list-disc list-inside ml-4 space-y-1 text-sm">
@@ -1990,7 +2375,7 @@ export default function GamePage() {
           <p className="text-gray-400 text-lg">选择游戏模式</p>
           <div className="flex gap-6 justify-center">
             <button
-              onClick={() => setGameMode("geometry")}
+              onClick={() => startGame("geometry")}
               className="px-8 py-6 bg-gradient-to-br from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 text-white font-bold text-xl rounded-xl transition-all shadow-lg shadow-yellow-500/30 hover:scale-105"
             >
               <div className="text-3xl mb-2">🔶</div>
@@ -2021,10 +2406,7 @@ export default function GamePage() {
               <div className="space-y-3">
                 <button
                   onClick={() => {
-                    setIsSpecialMode(false);
-                    isSpecialModeRef.current = false;
-                    setShowMathModeSelect(false);
-                    setGameMode("math");
+                    startGame("math");
                   }}
                   className="w-full p-4 rounded-lg border border-cyan-500/40 hover:border-cyan-400 hover:bg-cyan-950/40 cursor-pointer transition-all text-left"
                 >
@@ -2036,10 +2418,7 @@ export default function GamePage() {
                 </button>
                 <button
                   onClick={() => {
-                    setIsSpecialMode(true);
-                    isSpecialModeRef.current = true;
-                    setShowMathModeSelect(false);
-                    setGameMode("math");
+                    startGame("math", true);
                   }}
                   className="w-full p-4 rounded-lg border border-orange-500/40 hover:border-orange-400 hover:bg-orange-950/40 cursor-pointer transition-all text-left"
                 >
@@ -2065,11 +2444,26 @@ export default function GamePage() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black">
+      {achievementNotice}
+      <div className="absolute bottom-16 left-4 text-yellow-300 bg-black/60 rounded-lg px-3 py-2 text-sm z-40 pointer-events-none">🪙 金币：{coins} · {PLAYER_SKINS[skinIndex].name}</div>
+      {developerMode && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 rounded-lg border border-purple-400/40 bg-purple-950/80 px-4 py-2 text-center text-purple-100 text-xs z-40 pointer-events-none">
+          🛠️ 开发者模式 · 伤害 2³⁰ · 速度 500% · 生命 ∞ · 材料 2000%<br />按 O 返回主页，再按 K 退出开发者模式
+        </div>
+      )}
       <canvas ref={canvasRef} className="block w-full h-full" />
+      {gamePaused && (
+        <div role="status" className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none z-40">
+          <div className="rounded-xl border border-white/30 bg-gray-900/95 px-8 py-6 text-center text-white">
+            <p className="text-3xl font-bold">游戏已暂停</p>
+            <p className="mt-3 text-gray-300">按1键继续游戏</p>
+          </div>
+        </div>
+      )}
 
       {/* 返回首页按钮 */}
       <button
-        onClick={() => setGameMode("menu")}
+        onClick={returnHome}
         className="absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-black/50 hover:bg-black/70 border border-white/20 hover:border-white/40 text-white/60 hover:text-white text-sm rounded-lg transition-all z-40"
       >
         ← 返回首页
@@ -2090,15 +2484,17 @@ export default function GamePage() {
           <div className="flex gap-2">
             <input
               type="number"
+              disabled={gamePaused || gameOver}
               value={mathInput}
               onChange={(e) => setMathInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleMathSubmit()}
-              className="flex-1 px-2 py-1 bg-black/50 border border-cyan-500/30 rounded text-white text-center font-mono focus:outline-none focus:border-cyan-400"
-              placeholder="答案"
+              className="flex-1 min-w-0 px-2 py-1 bg-black/50 border border-cyan-500/30 rounded text-white text-center font-mono focus:outline-none focus:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              placeholder={gamePaused ? "暂停中，按1继续" : "答案"}
             />
             <button
               onClick={handleMathSubmit}
-              className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded text-sm transition-colors"
+              disabled={gamePaused || gameOver}
+              className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               确认
             </button>
@@ -2246,7 +2642,7 @@ export default function GamePage() {
                 重新开始
               </button>
               <button
-                onClick={() => setGameMode("menu")}
+                onClick={returnHome}
                 className="px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold text-lg rounded-lg transition-colors"
               >
                 返回菜单

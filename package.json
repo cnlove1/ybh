@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "build": "bash ./scripts/build.sh",
-    "dev": "bash ./scripts/dev.sh",
+    "build": "node scripts/run-next.mjs build",
+    "dev": "node scripts/run-next.mjs dev",
     "check:external-origin": "node scripts/check-external-origin.mjs",
     "tuya:manifest:check": "node scripts/tuya-manifest-check.mjs",
-    "start": "bash ./scripts/start.sh",
+    "start": "node scripts/run-next.mjs start",
     "lint": "eslint",
+    "test:monkey": "node tests/monkey.cjs",
     "ts-check": "tsc -p tsconfig.json"
   },
   "dependencies": {
@@ -87,7 +88,8 @@
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "pnpm": ">=9.0.0"
+    "pnpm": ">=9.0.0",
+    "node": ">=20.9.0"
   },
   "pnpm": {
     "overrides": {
